@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token System — Schule</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0F0F0F; --surface: #1A1A1A; --card: #222; --border: #2E2E2E;
+  --gold: #FBBF24; --text: #F5F5F0; --muted: #666; --soft: #3A3A3A;
+  --n1: #4ADE80; --n2: #86EFAC; --n3: #FDE68A;
+  --n4: #FDBA74; --n5: #F87171; --n6: #EF4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Instrument Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.screen { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active { display: flex; }
+#loadingScreen { align-items: center; justify-content: center; gap: 16px; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label { color: var(--muted); font-size: 0.85rem; }
+
+/* TOPBAR */
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 50; gap: 10px; }
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar h2 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-right { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.sync-dot.live { background: var(--n1); animation: blink 2.5s infinite; }
+.sync-dot.error { background: var(--n6); }
+@keyframes blink { 0%,100%{opacity:1} 60%{opacity:0.3} }
+.small-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; font-family: 'Instrument Sans', sans-serif; font-size: 0.73rem; color: var(--muted); cursor: pointer; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
+.small-btn:hover { color: var(--text); border-color: var(--soft); }
+
+/* CLASS SCREEN */
+#classScreen { padding: 28px 16px 60px; }
+#classScreen h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 28px; }
+.notice { background: #1A1500; border: 1px solid #3D3000; border-radius: 14px; padding: 14px 16px; margin-bottom: 20px; font-size: 0.8rem; line-height: 1.6; color: #C8A820; }
+.notice strong { display: block; margin-bottom: 4px; font-family: 'Syne', sans-serif; }
+.class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.class-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; padding: 18px 16px 14px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; position: relative; -webkit-tap-highlight-color: transparent; }
+.class-card:hover { border-color: var(--gold); }
+.class-card:active { transform: scale(0.97); }
+.cc-name { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+.cc-count { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+.cc-avg { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; }
+.cc-del { position: absolute; top: 10px; right: 12px; font-size: 0.72rem; color: var(--border); cursor: pointer; padding: 4px; transition: color 0.15s; }
+.cc-del:hover { color: var(--n6); }
+.add-class-btn { width: 100%; border: 1.5px dashed var(--border); background: transparent; border-radius: 18px; padding: 18px; color: var(--muted); font-family: 'Instrument Sans', sans-serif; font-size: 0.88rem; cursor: pointer; transition: all 0.15s; }
+.add-class-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* MODAL */
+.modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: flex-end; justify-content: center; backdrop-filter: blur(6px); }
+.modal-backdrop.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 24px 24px 0 0; padding: 28px 20px 40px; width: 100%; max-width: 500px; animation: slideUp 0.25s ease; }
+@keyframes slideUp { from { transform: translateY(40px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+.modal h3 { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 800; margin-bottom: 18px; }
+.field { margin-bottom: 14px; }
+.field label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 500; }
+.field input, .field textarea { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; color: var(--text); font-family: 'Instrument Sans', sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
+.field input:focus, .field textarea:focus { border-color: var(--gold); }
+.field textarea { resize: vertical; min-height: 130px; line-height: 1.7; }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+.btn-primary { flex: 1; background: var(--gold); color: #0F0F0F; border: none; border-radius: 12px; padding: 12px; font-family: 'Syne', sans-serif; font-size: 0.92rem; font-weight: 700; cursor: pointer; }
+.btn-cancel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-family: 'Instrument Sans', sans-serif; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+
+/* STUDENT GRID */
+.grid-wrap { padding: 14px 12px 90px; overflow-y: auto; flex: 1; }
+.students-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 9px; }
+.student-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 13px 7px 10px; text-align: center; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; user-select: none; position: relative; }
+.student-card:active { transform: scale(0.92); }
+.student-card.flash { animation: flashCard 0.4s ease; }
+@keyframes flashCard { 0%{transform:scale(1.1)} 100%{transform:scale(1)} }
+.s-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--soft); margin: 0 auto 7px; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--muted); transition: background 0.2s; }
+.s-name { font-size: 0.7rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+.s-tisch { font-size: 0.62rem; color: var(--muted); margin-bottom: 6px; }
+.s-note { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; line-height: 1; }
+.s-count { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+/* NOTE PICKER */
+#notePicker { display: none; position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); align-items: flex-end; justify-content: center; }
+#notePicker.open { display: flex; }
+.picker-box { background: var(--surface); border: 1px solid var(--border); border-radius: 24px 24px 0 0; padding: 24px 20px 40px; width: 100%; max-width: 400px; animation: slideUp 0.22s ease; }
+.picker-name { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; }
+.picker-tisch { font-size: 0.78rem; color: var(--muted); margin-bottom: 20px; }
+.notes-row { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; margin-bottom: 16px; }
+.note-btn { border: none; border-radius: 14px; padding: 14px 0; font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; cursor: pointer; transition: transform 0.1s; }
+.note-btn:active { transform: scale(0.92); }
+.note-btn[data-note="1"] { background: #1A3D26; color: var(--n1); }
+.note-btn[data-note="2"] { background: #1C3320; color: var(--n2); }
+.note-btn[data-note="3"] { background: #2D2A10; color: var(--n3); }
+.note-btn[data-note="4"] { background: #2D1E10; color: var(--n4); }
+.note-btn[data-note="5"] { background: #3D1A1A; color: var(--n5); }
+.note-btn[data-note="6"] { background: #3D0F0F; color: var(--n6); }
+.notiz-row { display: flex; gap: 8px; }
+.notiz-input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 13px; color: var(--text); font-family: 'Instrument Sans', sans-serif; font-size: 0.85rem; outline: none; }
+.notiz-input:focus { border-color: var(--gold); }
+.notiz-skip { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+
+/* OVERVIEW */
+.panel-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; padding: 20px 16px 40px; overflow-y: auto; backdrop-filter: blur(4px); }
+.panel-backdrop.open { display: block; }
+.panel-box { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; max-width: 460px; margin: 0 auto; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.panel-header h3 { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 800; }
+.close-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; width: 30px; height: 30px; color: var(--muted); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.section-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 14px 0 6px; }
+.ov-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+.ov-row:last-child { border-bottom: none; }
+.ov-name { font-weight: 500; }
+.ov-sub { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+.ov-note { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; }
+
+/* TOAST */
+.toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%) translateY(-12px); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 16px; border-radius: 30px; font-size: 0.8rem; font-weight: 500; opacity: 0; transition: all 0.2s; z-index: 300; white-space: nowrap; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="loadingScreen" class="screen active">
+  <div class="spinner"></div>
+  <span class="loading-label">Lade…</span>
+</div>
+
+<!-- KLASSENÜBERSICHT -->
+<div id="classScreen" class="screen">
+  <div style="padding:28px 16px 0">
+    <h1>🏫 Klassen</h1>
+    <p class="sub">Tippe auf eine Klasse → Schüler:in → Note vergeben</p>
+    <div id="scriptNotice" class="notice" style="display:none">
+      <strong>⚠ Script-URL fehlt</strong>
+      Trag deine Google Apps Script URL in Zeile 1 der index.html ein.
+      Bis dahin werden Einträge nur lokal gespeichert.
+    </div>
+  </div>
+  <div style="padding:12px 16px 60px">
+    <div class="class-grid" id="classGrid"></div>
+    <button class="add-class-btn" onclick="openNewClass()">＋ Neue Klasse anlegen</button>
+  </div>
+</div>
+
+<!-- KLASSEN-ANSICHT -->
+<div id="classView" class="screen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="small-btn" onclick="goBack()">← Klassen</button>
+      <h2 id="viewTitle"></h2>
+    </div>
+    <div class="topbar-right">
+      <div class="sync-dot" id="syncDot"></div>
+      <button class="small-btn" onclick="showOverview()">Übersicht</button>
+    </div>
+  </div>
+  <div style="padding:10px 16px 6px; border-bottom:1px solid var(--border); font-size:0.75rem; color:var(--muted);">
+    Schüler:in antippen → Note 1–6 vergeben → ins Sheet speichern
+  </div>
+  <div class="grid-wrap">
+    <div class="students-grid" id="studentsGrid"></div>
+  </div>
+</div>
+
+<!-- NEUE KLASSE -->
+<div class="modal-backdrop" id="newClassModal">
+  <div class="modal">
+    <h3>Neue Klasse</h3>
+    <div class="field">
+      <label>Klassenname (z.B. 8a)</label>
+      <input id="newClassName" placeholder="8a" maxlength="20" />
+    </div>
+    <div class="field">
+      <label>Vornamen — einer pro Zeile</label>
+      <textarea id="newClassNames" placeholder="Anna&#10;Ben&#10;Clara&#10;David&#10;…"></textarea>
+    </div>
+    <div class="field">
+      <label>Tische (optional) — Name:Tisch pro Zeile</label>
+      <textarea id="newClassTische" placeholder="Anna:Tisch 1&#10;Ben:Tisch 1&#10;Clara:Tisch 2&#10;…" style="min-height:80px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeNewClass()">Abbrechen</button>
+      <button class="btn-primary" onclick="createClass()">Anlegen →</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTE PICKER -->
+<div id="notePicker">
+  <div class="picker-box">
+    <div class="picker-name" id="pickerName"></div>
+    <div class="picker-tisch" id="pickerTisch"></div>
+    <div class="notes-row">
+      <button class="note-btn" data-note="1" onclick="submitNote(1)">1</button>
+      <button class="note-btn" data-note="2" onclick="submitNote(2)">2</button>
+      <button class="note-btn" data-note="3" onclick="submitNote(3)">3</button>
+      <button class="note-btn" data-note="4" onclick="submitNote(4)">4</button>
+      <button class="note-btn" data-note="5" onclick="submitNote(5)">5</button>
+      <button class="note-btn" data-note="6" onclick="submitNote(6)">6</button>
+    </div>
+    <div class="notiz-row">
+      <input class="notiz-input" id="notizInput" placeholder="Kurze Notiz (optional)…" maxlength="100" />
+      <button class="notiz-skip" onclick="closePicker()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ÜBERSICHT -->
+<div class="panel-backdrop" id="overviewPanel" onclick="panelBgClick(event)">
+  <div class="panel-box">
+    <div class="panel-header">
+      <h3>📊 Notenübersicht</h3>
+      <button class="close-btn" onclick="hideOverview()">✕</button>
+    </div>
+    <div id="overviewContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 👇 HIER DEINE GOOGLE APPS SCRIPT URL EINTRAGEN ──────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfE4KaHfdsvG1dv63EveKyTpxcqRxus8nlg9B9XzH4S_xG67Zw6menRzW10aC8jlCPeA/exec';
+// ────────────────────────────────────────────────────────────────
+
+const LS_KEY = 'token_schule_v3';
+const NOTE_COLORS = { 1:'var(--n1)',2:'var(--n2)',3:'var(--n3)',4:'var(--n4)',5:'var(--n5)',6:'var(--n6)' };
+const NOTE_BG     = { 1:'#1A3D26',2:'#1C3320',3:'#2D2A10',4:'#2D1E10',5:'#3D1A1A',6:'#3D0F0F' };
+
+// State
+let classes = {};          // { id: { name, students:[{name,tisch,noten:[]}] } }
+let currentClassId = null;
+let pickerStudent  = null; // { idx }
+
+// ── STORAGE ──────────────────────────────────────
+function lsSave() { try { localStorage.setItem(LS_KEY, JSON.stringify(classes)); } catch(e) {} }
+function lsLoad() { try { const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):{}; } catch(e){return {};} }
+
+async function remotePost(entry) {
+  if (SCRIPT_URL==='DEINE_APPS_SCRIPT_URL') return;
+  try {
+    await fetch(SCRIPT_URL, {
+      method:'POST',
+      body: JSON.stringify(entry)
+    });
+    setSyncDot('live');
+  } catch(e) { setSyncDot('error'); }
+}
+
+// ── SCREENS ──────────────────────────────────────
+function show(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+// ── INIT ─────────────────────────────────────────
+function init() {
+  if (SCRIPT_URL==='DEINE_APPS_SCRIPT_URL') document.getElementById('scriptNotice').style.display='block';
+  classes = lsLoad();
+  show('classScreen');
+  renderClassList();
+}
+
+// ── NOTENSCHNITT ──────────────────────────────────
+function avgNote(students) {
+  const all = students.flatMap(s=>s.noten||[]);
+  if (!all.length) return null;
+  return (all.reduce((a,b)=>a+b,0)/all.length).toFixed(1);
+}
+function noteColor(n) {
+  if (!n) return 'var(--muted)';
+  const r = Math.round(n);
+  return NOTE_COLORS[Math.min(6,Math.max(1,r))];
+}
+
+// ── CLASS LIST ───────────────────────────────────
+function renderClassList() {
+  const grid = document.getElementById('classGrid');
+  const entries = Object.entries(classes);
+  if (!entries.length) {
+    grid.innerHTML='<p style="color:var(--muted);font-size:0.85rem;grid-column:span 2;padding:4px 0">Noch keine Klassen angelegt.</p>';
+    return;
+  }
+  grid.innerHTML='';
+  entries.forEach(([id,cls])=>{
+    const avg = avgNote(cls.students||[]);
+    const totalNoten = (cls.students||[]).reduce((s,st)=>s+(st.noten||[]).length,0);
+    const card = document.createElement('div');
+    card.className='class-card';
+    card.innerHTML=`
+      <span class="cc-del" onclick="deleteClass(event,'${id}')">✕</span>
+      <div class="cc-name">${cls.name}</div>
+      <div class="cc-count">${(cls.students||[]).length} Schüler:innen · ${totalNoten} Noten</div>
+      <div class="cc-avg" style="color:${noteColor(avg)}">${avg ? '⌀ '+avg : '—'}</div>`;
+    card.addEventListener('click',()=>openClass(id));
+    grid.appendChild(card);
+  });
+}
+
+function openClass(id) {
+  currentClassId=id;
+  document.getElementById('viewTitle').textContent=classes[id].name;
+  renderGrid();
+  show('classView');
+}
+
+function goBack() {
+  currentClassId=null;
+  show('classScreen');
+  renderClassList();
+}
+
+// ── NEW CLASS ─────────────────────────────────────
+function openNewClass() {
+  ['newClassName','newClassNames','newClassTische'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('newClassModal').classList.add('open');
+  setTimeout(()=>document.getElementById('newClassName').focus(),80);
+}
+function closeNewClass() { document.getElementById('newClassModal').classList.remove('open'); }
+
+function createClass() {
+  const name=document.getElementById('newClassName').value.trim();
+  if (!name) { document.getElementById('newClassName').focus(); return; }
+
+  // Tisch-Zuordnung parsen
+  const tischMap={};
+  document.getElementById('newClassTische').value.split('\n').forEach(line=>{
+    const [n,t]=line.split(':').map(s=>s.trim());
+    if (n&&t) tischMap[n]=t;
+  });
+
+  const students=document.getElementById('newClassNames').value
+    .split('\n').map(n=>n.trim()).filter(Boolean)
+    .map(n=>({ name:n, tisch:tischMap[n]||'', noten:[] }));
+
+  const id='cls_'+Date.now();
+  classes[id]={name,students};
+  lsSave();
+  closeNewClass();
+  renderClassList();
+  openClass(id);
+}
+
+function deleteClass(e,id) {
+  e.stopPropagation();
+  if (!confirm(`Klasse "${classes[id]?.name}" und alle Noten löschen?`)) return;
+  delete classes[id];
+  lsSave();
+  renderClassList();
+}
+
+// ── STUDENT GRID ──────────────────────────────────
+function renderGrid() {
+  const students=classes[currentClassId]?.students||[];
+  const grid=document.getElementById('studentsGrid');
+  grid.innerHTML='';
+  students.forEach((s,i)=>{
+    const noten=s.noten||[];
+    const avg=noten.length ? (noten.reduce((a,b)=>a+b,0)/noten.length).toFixed(1) : null;
+    const col=noteColor(avg);
+    const bgCol=avg ? NOTE_BG[Math.min(6,Math.max(1,Math.round(avg)))] : 'var(--soft)';
+    const card=document.createElement('div');
+    card.id='sc'+i;
+    card.className='student-card';
+    card.innerHTML=`
+      <div class="s-avatar" style="background:${bgCol};color:${col}">${s.name.charAt(0)}</div>
+      <div class="s-name">${s.name}</div>
+      ${s.tisch ? `<div class="s-tisch">${s.tisch}</div>` : ''}
+      <div class="s-note" style="color:${col}">${avg ? '⌀ '+avg : '·'}</div>
+      <div class="s-count">${noten.length ? noten.length+'×' : ''}</div>`;
+    card.addEventListener('click',()=>openPicker(i));
+    grid.appendChild(card);
+  });
+}
+
+// ── NOTE PICKER ───────────────────────────────────
+function openPicker(idx) {
+  const s=classes[currentClassId].students[idx];
+  pickerStudent={idx};
+  document.getElementById('pickerName').textContent=s.name;
+  document.getElementById('pickerTisch').textContent=s.tisch||'';
+  document.getElementById('notizInput').value='';
+  document.getElementById('notePicker').classList.add('open');
+  setTimeout(()=>document.getElementById('notizInput').focus(),200);
+}
+function closePicker() { document.getElementById('notePicker').classList.remove('open'); pickerStudent=null; }
+
+// Enter im Notizfeld → schnell speichern ohne Note (abbrechen)
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('notizInput').addEventListener('keydown',e=>{
+    if (e.key==='Enter') closePicker();
+  });
+});
+
+async function submitNote(note) {
+  if (!pickerStudent) return;
+  const idx=pickerStudent.idx;
+  const s=classes[currentClassId].students[idx];
+  const notiz=document.getElementById('notizInput').value.trim();
+
+  // Lokal speichern
+  s.noten=[...( s.noten||[]),note];
+  lsSave();
+  closePicker();
+
+  // Flash
+  const card=document.getElementById('sc'+idx);
+  if (card) { card.classList.add('flash'); setTimeout(()=>card.classList.remove('flash'),400); }
+  renderGrid();
+
+  showToast(`${s.name} → Note ${note}${notiz?' · '+notiz:''}`);
+
+  // Ins Sheet schreiben
+  await remotePost({
+    tisch:   s.tisch||'',
+    schueler: s.name,
+    note:    note,
+    notiz:   notiz
+  });
+}
+
+// ── OVERVIEW ──────────────────────────────────────
+function showOverview() {
+  const students=classes[currentClassId]?.students||[];
+  const sorted=[...students].sort((a,b)=>{
+    const avgA=(a.noten||[]).length?(a.noten.reduce((x,y)=>x+y,0)/a.noten.length):99;
+    const avgB=(b.noten||[]).length?(b.noten.reduce((x,y)=>x+y,0)/b.noten.length):99;
+    return avgA-avgB;
+  });
+  let html='';
+  const withNoten=sorted.filter(s=>(s.noten||[]).length>0);
+  const without=sorted.filter(s=>!(s.noten||[]).length);
+  if (withNoten.length) {
+    html+='<div class="section-head">Alle benoteten Schüler:innen</div>';
+    withNoten.forEach(s=>{
+      const avg=(s.noten.reduce((a,b)=>a+b,0)/s.noten.length).toFixed(1);
+      const col=noteColor(avg);
+      html+=`<div class="ov-row">
+        <div><div class="ov-name">${s.name}</div><div class="ov-sub">${s.tisch||''} · ${s.noten.length} Noten: ${s.noten.join(', ')}</div></div>
+        <div class="ov-note" style="color:${col}">⌀ ${avg}</div>
+      </div>`;
+    });
+  }
+  if (without.length) {
+    html+='<div class="section-head">· Noch keine Note</div>';
+    without.forEach(s=>{
+      html+=`<div class="ov-row"><div class="ov-name">${s.name}</div><div class="ov-note" style="color:var(--muted)">—</div></div>`;
+    });
+  }
+  document.getElementById('overviewContent').innerHTML=html||'<p style="color:var(--muted);font-size:0.85rem">Noch keine Noten vergeben.</p>';
+  document.getElementById('overviewPanel').classList.add('open');
+}
+function hideOverview() { document.getElementById('overviewPanel').classList.remove('open'); }
+function panelBgClick(e) { if (e.target===document.getElementById('overviewPanel')) hideOverview(); }
+
+// ── HELPERS ───────────────────────────────────────
+function setSyncDot(s) { const d=document.getElementById('syncDot'); if(d) d.className='sync-dot '+s; }
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+init();
+</script>
+</body>
+</html>
