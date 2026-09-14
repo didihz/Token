@@ -222,7 +222,7 @@ body { font-family: 'Instrument Sans', sans-serif; background: var(--bg); color:
 
 <script>
 // ── 👇 HIER DEINE GOOGLE APPS SCRIPT URL EINTRAGEN ──────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfE4KaHfdsvG1dv63EveKyTpxcqRxus8nlg9B9XzH4S_xG67Zw6men/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfE4KaHfdsvG1dv63EveKyTpxcqRxus8nlg9B9XzH4S_xG67Zw6menRzW10aC8jlCPeA/exec';
 // ────────────────────────────────────────────────────────────────
 
 const LS_KEY = 'token_schule_v3';
@@ -241,10 +241,15 @@ function lsLoad() { try { const r=localStorage.getItem(LS_KEY); return r?JSON.pa
 async function remotePost(entry) {
   if (SCRIPT_URL==='DEINE_APPS_SCRIPT_URL') return;
   try {
-    await fetch(SCRIPT_URL, {
-      method:'POST',
-      body: JSON.stringify(entry)
+    // GET mit Parametern umgeht CORS-Probleme bei Apps Script
+    const params = new URLSearchParams({
+      action: 'post',
+      tisch:    entry.tisch    || '',
+      schueler: entry.schueler || '',
+      note:     entry.note     || '',
+      notiz:    entry.notiz    || ''
     });
+    await fetch(SCRIPT_URL + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
     setSyncDot('live');
   } catch(e) { setSyncDot('error'); }
 }
@@ -464,4 +469,3 @@ init();
 </script>
 </body>
 </html>
-
