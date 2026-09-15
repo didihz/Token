@@ -177,6 +177,11 @@ body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--t
       <input class="notiz-input" id="notizInput" placeholder="Kurze Notiz (optional)…" maxlength="100"/>
       <button class="notiz-skip" onclick="closePicker()">Abbrechen</button>
     </div>
+    <div id="undoRow" style="margin-top:12px;display:none;">
+      <button onclick="undoLastNote()" style="width:100%;background:var(--b5);border:1px solid var(--n5);border-radius:12px;padding:11px;color:var(--n5);font-family:Syne,sans-serif;font-size:0.85rem;font-weight:700;cursor:pointer;">
+        ↩ Letzte Note löschen (war: <span id="lastNoteLabel"></span>)
+      </button>
+    </div>
   </div>
 </div>
 
@@ -383,9 +388,35 @@ function openPicker(idx) {
   document.getElementById('pickerName').textContent=s.name;
   document.getElementById('pickerTisch').textContent=s.tisch||'';
   document.getElementById('notizInput').value='';
+  // Undo-Button anzeigen wenn Noten vorhanden
+  const noten=s.noten||[];
+  const undoRow=document.getElementById('undoRow');
+  if(noten.length>0){
+    document.getElementById('lastNoteLabel').textContent=noten[noten.length-1];
+    undoRow.style.display='block';
+  } else {
+    undoRow.style.display='none';
+  }
   document.getElementById('notePicker').classList.add('open');
 }
 function closePicker() { document.getElementById('notePicker').classList.remove('open'); pickerStudent=null; }
+
+async function undoLastNote() {
+  if (!pickerStudent) return;
+  const s=classes[currentClassId].students[pickerStudent.idx];
+  if(!(s.noten||[]).length) return;
+  const removed=s.noten.pop();
+  saveNotenLocal();
+  closePicker();
+  renderGrid();
+  showToast(`↩ Note ${removed} bei ${s.name} gelöscht`);
+  // Letzte Zeile im Sheet löschen
+  await remoteSend({
+    action: 'deleteLastNote',
+    schueler: s.name,
+    klasseName: classes[currentClassId].name
+  });
+}
 
 async function submitNote(note) {
   if (!pickerStudent) return;
